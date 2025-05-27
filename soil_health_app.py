@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from io import StringIO
 
+# Must be the first Streamlit command
+st.set_page_config(page_title="Soil Health Analyzer", layout="wide")
+
 # ------------------------------
 # Model Creation
 # ------------------------------
@@ -51,7 +54,6 @@ crop_recommendations = {
 # ------------------------------
 # UI Components
 # ------------------------------
-st.set_page_config(page_title="Soil Health Analyzer", layout="wide")
 st.title("🌱 Interactive Soil Health Analyzer & Crop Advisor")
 
 st.markdown("""
