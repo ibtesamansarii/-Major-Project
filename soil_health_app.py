@@ -66,7 +66,7 @@ if st.button("Predict Crop Suggestion"):
     }
 
     st.markdown(f"""
-        <div style='font-size:22px; font-weight:bold;'>
+        <div style='font-size:26px; font-weight:bold;'>
             🧬 Predicted Fertility Level: <span style='color:blue'>{fertility}</span><br>
             🌾 Recommended Crops: <span style='color:green'>{', '.join(crop_recommendation[fertility])}</span>
         </div>
