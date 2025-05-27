@@ -50,6 +50,53 @@ crop_recommendation = {
     "Medium": ["Maize", "Rice"],
     "High": ["Wheat", "Sugarcane"]
 }
+import streamlit as st
+import pandas as pd
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+
+# Assuming you have your trained model & fertility_map loaded as `model` and `fertility_map`
+
+st.title("🧪 Fertilizer Tips Based on Soil Parameters")
+
+n = st.number_input("Nitrogen (N)", min_value=0, max_value=150, value=50)
+p = st.number_input("Phosphorus (P)", min_value=0, max_value=150, value=50)
+k = st.number_input("Potassium (K)", min_value=0, max_value=200, value=50)
+ph = st.number_input("pH Level", min_value=4.0, max_value=9.0, value=6.5, format="%.1f")
+moisture = st.number_input("Moisture (%)", min_value=0, max_value=100, value=50)
+
+if st.button("Get Fertilizer Tips"):
+    input_df = pd.DataFrame([[n, p, k, ph, moisture]], columns=["N", "P", "K", "pH", "moisture"])
+    pred = model.predict(input_df)[0]
+    fertility = fertility_map[pred]
+
+    tips = {
+        "Low": "Use organic compost, urea, and DAP to boost NPK levels.",
+        "Medium": "Apply balanced NPK fertilizers and practice crop rotation.",
+        "High": "Maintain current fertilization and monitor moisture & pH regularly."
+    }
+
+    colors = {
+        "Low": "#FF6347",       # Tomato red (high contrast)
+        "Medium": "#FFA500",    # Orange
+        "High": "#32CD32",      # LimeGreen
+    }
+
+    st.markdown(f"""
+        <div style="
+            background-color: {colors[fertility]};
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            font-size: 28px;
+            font-weight: 900;
+            text-align: center;
+            margin-top: 20px;
+        ">
+            Fertility Level: {fertility} <br><br>
+            Fertilizer Tip: {tips[fertility]}
+        </div>
+    """, unsafe_allow_html=True)
 
 fertilizer_tips = {
     "Low": {
