@@ -3,14 +3,12 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
-import seaborn as sns
-from io import StringIO
 
-# Must be the first Streamlit command
+# Must be first Streamlit command
 st.set_page_config(page_title="Soil Health Analyzer", layout="wide")
 
 # ------------------------------
-# Model Creation
+# Train or load model
 # ------------------------------
 @st.cache_data
 def train_model():
@@ -46,78 +44,71 @@ model = train_model()
 
 fertility_map = {0: "Low", 1: "Medium", 2: "High"}
 crop_recommendations = {
-    "Low": ["Legumes", "Rice"],
-    "Medium": ["Maize", "wheat"],
+    "Low": ["Legumes", "Barley"],
+    "Medium": ["Maize", "Rice"],       # Soybean replaced by Rice here
     "High": ["Wheat", "Sugarcane"]
 }
 
 # ------------------------------
-# UI Components
+# UI
 # ------------------------------
-st.title("🌱 Interactive Soil Health Analyzer & Crop Advisor")
 
-st.markdown("""
-Welcome to the Soil Health Analyzer! Upload your soil data or enter values below to:
-- 🔍 Predict soil fertility level
-- 🌾 Get crop recommendations
-- 📊 Visualize nutrient levels and distribution
-""")
+st.title("🌱 Soil Health & Crop Suggestion Analyzer")
 
-# ------------------------------
-# Sidebar Inputs
-# ------------------------------
-st.sidebar.header("🔧 Manual Input")
-n = st.sidebar.slider("Nitrogen (N)", 0, 140, 60)
-p = st.sidebar.slider("Phosphorus (P)", 5, 145, 60)
-k = st.sidebar.slider("Potassium (K)", 5, 205, 100)
-ph = st.sidebar.slider("pH", 4.5, 8.5, 6.5)
-moisture = st.sidebar.slider("Moisture (%)", 10.0, 90.0, 50.0)
+with st.sidebar:
+    st.header("Enter Soil Parameters")
+    n = st.slider("Nitrogen (N)", 0, 140, 60)
+    p = st.slider("Phosphorus (P)", 5, 145, 60)
+    k = st.slider("Potassium (K)", 5, 205, 100)
+    ph = st.slider("pH", 4.5, 8.5, 6.5)
+    moisture = st.slider("Moisture (%)", 10.0, 90.0, 50.0)
 
-if st.sidebar.button("🌾 Predict Crop Suggestion"):
-    input_data = pd.DataFrame([[n, p, k, ph, moisture]], columns=["N", "P", "K", "pH", "moisture"])
-    prediction = model.predict(input_data)[0]
-    fertility = fertility_map[prediction]
+if st.button("Predict Fertility and Suggest Crops"):
+
+    input_df = pd.DataFrame([[n, p, k, ph, moisture]], columns=["N", "P", "K", "pH", "moisture"])
+    pred = model.predict(input_df)[0]
+    fertility = fertility_map[pred]
     crops = crop_recommendations[fertility]
-    st.success(f"Predicted Fertility Level: **{fertility}**")
-    st.info(f"Recommended Crops: {', '.join(crops)}")
 
-# ------------------------------
-# File Upload
-# ------------------------------
-st.markdown("---")
-st.subheader("📂 Upload CSV for Batch Prediction")
-sample_csv = """N,P,K,pH,moisture
-50,30,40,6.5,35
-85,60,70,6.8,45
-120,110,160,6.2,50
-35,20,25,5.5,30
-"""
+    # Colored badge for fertility level
+    color_map = {"Low": "#FF6347", "Medium": "#FFA500", "High": "#32CD32"}  # tomato, orange, limegreen
+    st.markdown(f"### Fertility Level: <span style='color:{color_map[fertility]}; font-weight:bold'>{fertility}</span>", unsafe_allow_html=True)
 
-st.download_button("📥 Download Sample CSV", sample_csv.encode('utf-8'), "sample_soil_data.csv")
-file = st.file_uploader("Upload your CSV file here", type="csv")
+    # Show crop suggestions as tags/buttons
+    st.markdown("**Recommended Crops:**")
+    cols = st.columns(len(crops))
+    for i, crop in enumerate(crops):
+        cols[i].button(crop)
 
-if file:
-    df = pd.read_csv(file)
-    try:
-        preds = model.predict(df[["N", "P", "K", "pH", "moisture"]])
-        df["Fertility"] = [fertility_map[p] for p in preds]
-        df["Recommended Crops"] = df["Fertility"].map(lambda x: ", ".join(crop_recommendations[x]))
+    # Nutrient bar chart for input values
+    st.markdown("---")
+    st.markdown("### Soil Nutrient Levels")
+    thresholds = {"N": 100, "P": 100, "K": 150}
+    nutrients = ["N", "P", "K"]
+    values = [n, p, k]
 
-        st.dataframe(df)
-        st.download_button("📤 Download Results", df.to_csv(index=False).encode('utf-8'), "predicted_soil_data.csv")
+    fig, ax = plt.subplots()
+    bars = ax.bar(nutrients, values, color='cornflowerblue', label='Input Values')
+    ax.axhline(thresholds["N"], color='r', linestyle='--', label='N Threshold')
+    ax.axhline(thresholds["P"], color='g', linestyle='--', label='P Threshold')
+    ax.axhline(thresholds["K"], color='purple', linestyle='--', label='K Threshold')
+    ax.set_ylim(0, max(values + list(thresholds.values())) + 20)
+    ax.set_ylabel('Amount (mg/kg)')
+    ax.set_title("Nutrient Levels vs. Fertility Thresholds")
+    ax.legend()
 
-        st.subheader("📊 Visual Analysis")
-        fig, ax = plt.subplots(1, 3, figsize=(18, 4))
-        sns.histplot(df["N"], kde=True, ax=ax[0], color='green').set(title="Nitrogen Distribution")
-        sns.histplot(df["P"], kde=True, ax=ax[1], color='orange').set(title="Phosphorus Distribution")
-        sns.histplot(df["K"], kde=True, ax=ax[2], color='purple').set(title="Potassium Distribution")
-        st.pyplot(fig)
+    # Label bars with values
+    for bar in bars:
+        height = bar.get_height()
+        ax.annotate(f'{height}',
+                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom')
 
-        pie_fig, pie_ax = plt.subplots()
-        pie_data = df["Fertility"].value_counts()
-        pie_ax.pie(pie_data, labels=pie_data.index, autopct='%1.1f%%', startangle=90)
-        pie_ax.axis('equal')
-        st.pyplot(pie_fig)
+    st.pyplot(fig)
 
-    except Exception as e:
-        st.error(f"Error in processing file: {e}")
+    # Show input pH and moisture info
+    st.markdown("---")
+    st.markdown(f"**Soil pH:** {ph} (ideal range: 6.0 - 7.5)")
+    st.markdown(f"**Soil Moisture:** {moisture}% (optimal varies by crop)")
