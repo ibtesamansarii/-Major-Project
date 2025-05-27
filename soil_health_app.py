@@ -5,6 +5,7 @@ import joblib
 from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
 import seaborn as sns
+from io import StringIO
 
 # ---------------------------
 # Create dataset and model
@@ -82,6 +83,22 @@ if st.sidebar.button("Predict Fertility & Suggest Crops"):
 # ---------------------------
 st.markdown("---")
 st.subheader("📁 Batch Prediction with CSV Upload")
+
+# Built-in real-life sample CSV
+sample_csv_data = """N,P,K,pH,moisture
+50,30,40,6.5,35
+85,60,70,6.8,45
+120,110,160,6.2,50
+35,20,25,5.5,30
+60,45,80,7.0,55
+100,90,130,6.4,48
+140,130,180,6.6,60
+25,10,15,5.0,28
+110,80,120,7.1,52
+75,65,85,6.9,49
+"""
+sample_bytes = sample_csv_data.encode("utf-8")
+st.download_button("⬇️ Download Sample CSV", sample_bytes, file_name="real_soil_data.csv", mime="text/csv")
 
 uploaded_file = st.file_uploader("Upload CSV file with columns: N, P, K, pH, moisture", type=["csv"])
 
