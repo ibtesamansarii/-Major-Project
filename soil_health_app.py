@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 
-# Set page config (must be first)
-st.set_page_config(page_title="🌱 Soil Health & Crop Prediction", layout="wide")
+# --- Setup ---
+st.set_page_config(page_title="Soil Health Analyzer", layout="wide")
 
-# --- Data & Model Setup ---
-
+# --- Create synthetic dataset and train model ---
 def create_dataset():
     np.random.seed(42)
     data = {
@@ -30,209 +31,160 @@ def create_dataset():
     df["fertility"] = df.apply(label_fertility, axis=1)
     return df
 
-df_train = create_dataset()
-fertility_map = {"Low": 0, "Medium": 1, "High": 2}
-reverse_fertility_map = {v: k for k, v in fertility_map.items()}
-df_train["fertility_label"] = df_train["fertility"].map(fertility_map)
+df = create_dataset()
+df["fertility_label"] = df["fertility"].map({"Low": 0, "Medium": 1, "High": 2})
 
-X_train = df_train[["N", "P", "K", "pH", "moisture"]]
-y_train = df_train["fertility_label"]
+X = df[["N", "P", "K", "pH", "moisture"]]
+y = df["fertility_label"]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 
-# Crop suggestions based on fertility
+fertility_map = {0: "Low", 1: "Medium", 2: "High"}
+reverse_fertility_map = {v: k for k, v in fertility_map.items()}
+
 crop_recommendation = {
     "Low": ["Legumes", "Barley"],
     "Medium": ["Maize", "Rice"],
-    "High": ["Wheat", "Sugarcane"],
+    "High": ["Wheat", "Sugarcane"]
 }
 
-# Fertilizer tips by fertility level with bright colors
 fertilizer_tips = {
     "Low": {
         "tip": "Use organic compost, urea, and DAP to boost NPK levels.",
-        "color": "#ffcccc",  # light red
+        "color": "#ffcccc",
     },
     "Medium": {
         "tip": "Apply balanced NPK fertilizers and practice crop rotation.",
-        "color": "#fff3b0",  # light yellow
+        "color": "#fff4cc",
     },
     "High": {
         "tip": "Maintain current fertilization and monitor moisture & pH regularly.",
-        "color": "#ccffcc",  # light green
+        "color": "#ccffcc",
     },
 }
 
-# --- UI ---
+# --- Sidebar navigation ---
+st.sidebar.title("Navigation")
+selected_tab = st.sidebar.radio("Go to", ["Crop Prediction", "CSV Upload & Analysis", "Fertilizer Tips"])
 
-# Custom CSS for capsule-shaped buttons
-st.markdown(
-    """
-    <style>
-    .capsule-btn {
-        display: inline-block;
-        padding: 12px 36px;
-        margin: 5px;
-        border-radius: 50px;
-        font-size: 20px;
-        font-weight: 600;
-        cursor: pointer;
-        user-select: none;
-        border: 2px solid #4CAF50;
-        color: #4CAF50;
-        background-color: white;
-        transition: all 0.3s ease;
-    }
-    .capsule-btn:hover {
-        background-color: #4CAF50;
-        color: white;
-    }
-    .capsule-btn-selected {
-        background-color: #4CAF50;
-        color: white;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# --- Crop Prediction ---
+if selected_tab == "Crop Prediction":
+    st.title("🌾 Crop Prediction")
 
-# Session state for tab selection
-if "selected_tab" not in st.session_state:
-    st.session_state.selected_tab = "Crop Prediction"
+    st.markdown(
+        "<style> \
+        .big-button > button {font-size: 20px; padding: 15px 25px;} \
+        </style>",
+        unsafe_allow_html=True,
+    )
 
-def select_tab(tab):
-    st.session_state.selected_tab = tab
-
-# Tabs
-cols = st.columns([1, 1, 1])
-with cols[0]:
-    if st.button("🌾 Crop Prediction", key="tab_crop"):
-        select_tab("Crop Prediction")
-with cols[1]:
-    if st.button("📂 CSV Upload & Soil Analysis", key="tab_csv"):
-        select_tab("CSV Upload")
-with cols[2]:
-    if st.button("🧪 Fertilizer Tips", key="tab_fertilizer"):
-        select_tab("Fertilizer Tips")
-
-st.markdown("---")
-
-# --- Crop Prediction Tab ---
-if st.session_state.selected_tab == "Crop Prediction":
-    st.header("🌾 Crop Prediction from Soil Parameters")
-
-    n = st.slider("Nitrogen (N) [mg/kg]", 0, 150, 50)
-    p = st.slider("Phosphorus (P) [mg/kg]", 0, 150, 50)
-    k = st.slider("Potassium (K) [mg/kg]", 0, 200, 50)
-    ph = st.slider("pH Level", 4.0, 9.0, 6.5, step=0.1)
+    n = st.slider("Nitrogen (N)", 0, 150, 50)
+    p = st.slider("Phosphorus (P)", 0, 150, 50)
+    k = st.slider("Potassium (K)", 0, 200, 50)
+    ph = st.slider("pH Level", 4.0, 9.0, 6.5, 0.1)
     moisture = st.slider("Moisture (%)", 0, 100, 50)
 
-    if st.button("🔍 Predict Crop"):
+    if st.button("🔍 Predict Crop", key="predict_crop"):
         input_df = pd.DataFrame([[n, p, k, ph, moisture]], columns=["N", "P", "K", "pH", "moisture"])
-        pred = model.predict(input_df)[0]
-        fertility = reverse_fertility_map[pred]
-        crops = crop_recommendation[fertility]
+        prediction = model.predict(input_df)[0]
+        fertility = fertility_map[prediction]
 
         st.markdown(
             f"""
             <div style='
-                background-color: #e8f5e9; 
-                border: 3px solid #4caf50; 
-                border-radius: 15px; 
-                padding: 25px; 
-                margin-top: 20px; 
-                text-align: center;'>
-                <h1 style='color:#2e7d32; font-weight: 900; font-size: 48px;'>🌿 Fertility Level: {fertility}</h1>
-                <h2 style='color:#1565c0; font-weight: 800; font-size: 36px;'>🌾 Recommended Crops: {", ".join(crops)}</h2>
+                background-color: #e0f7fa;
+                border-radius: 15px;
+                padding: 30px;
+                margin-top: 20px;
+                text-align: center;
+                border: 3px solid #00796b;
+            '>
+                <h1 style='color: #004d40; font-weight: 900; font-size: 48px;'>🌿 Fertility Level: {fertility}</h1>
+                <h2 style='color: #00796b; font-weight: 700; font-size: 36px;'>Recommended Crops: {", ".join(crop_recommendation[fertility])}</h2>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-# --- CSV Upload & Soil Analysis Tab ---
-elif st.session_state.selected_tab == "CSV Upload":
-    st.header("📂 Upload CSV & Analyze Soil Health")
+# --- CSV Upload & Soil Health Analysis ---
+elif selected_tab == "CSV Upload & Analysis":
+    st.title("📊 Upload CSV for Soil Health Analysis")
 
-    uploaded_file = st.file_uploader(
-        "Upload CSV file with columns: N, P, K, pH, moisture", type=["csv"]
-    )
+    uploaded_file = st.file_uploader("Upload your soil data CSV file here", type=["csv"])
 
     if uploaded_file is not None:
         try:
-            df = pd.read_csv(uploaded_file)
-            required_cols = {"N", "P", "K", "pH", "moisture"}
-            if not required_cols.issubset(df.columns):
-                st.error(f"CSV must contain these columns: {required_cols}")
+            df_uploaded = pd.read_csv(uploaded_file)
+            required_cols = ["N", "P", "K", "pH", "moisture"]
+
+            if not set(required_cols).issubset(df_uploaded.columns):
+                st.error(f"CSV file must contain columns: {required_cols}")
             else:
-                # Predict fertility for each row
-                X = df[list(required_cols)]
-                preds = model.predict(X)
-                df["Fertility"] = [reverse_fertility_map[p] for p in preds]
+                X_uploaded = df_uploaded[required_cols]  # fixed order for model input
+                preds = model.predict(X_uploaded)
+                df_uploaded["Fertility"] = [fertility_map[p] for p in preds]
 
-                # Show sample data
-                st.subheader("📋 Sample Data Preview")
-                st.dataframe(df.head())
+                st.subheader("Soil Fertility Results")
+                st.dataframe(df_uploaded)
 
-                # Show averages
-                st.subheader("📊 Average Nutrient Levels")
-                avg_n = df["N"].mean()
-                avg_p = df["P"].mean()
-                avg_k = df["K"].mean()
-                avg_ph = df["pH"].mean()
-                avg_moisture = df["moisture"].mean()
+                # Show average nutrient values
+                avg_n = df_uploaded["N"].mean()
+                avg_p = df_uploaded["P"].mean()
+                avg_k = df_uploaded["K"].mean()
 
-                col1, col2, col3, col4, col5 = st.columns(5)
-                col1.metric("Avg Nitrogen (N)", f"{avg_n:.1f} mg/kg")
-                col2.metric("Avg Phosphorus (P)", f"{avg_p:.1f} mg/kg")
-                col3.metric("Avg Potassium (K)", f"{avg_k:.1f} mg/kg")
-                col4.metric("Avg pH Level", f"{avg_ph:.2f}")
-                col5.metric("Avg Moisture (%)", f"{avg_moisture:.1f}")
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Average Nitrogen (N)", f"{avg_n:.2f} mg/kg")
+                col2.metric("Average Phosphorus (P)", f"{avg_p:.2f} mg/kg")
+                col3.metric("Average Potassium (K)", f"{avg_k:.2f} mg/kg")
 
-                # Fertility distribution chart
-                st.subheader("🌾 Fertility Distribution")
-                fert_counts = df["Fertility"].value_counts().rename_axis('Fertility').reset_index(name='Counts')
-                st.bar_chart(fert_counts.set_index("Fertility"))
+                # Fertility distribution bar chart
+                st.subheader("Fertility Distribution")
+                dist = df_uploaded["Fertility"].value_counts()
+                st.bar_chart(dist)
 
-                # Summary & recommendations
-                st.subheader("📝 Soil Health Summary")
-                total = len(df)
-                high = (df["Fertility"] == "High").sum()
-                medium = (df["Fertility"] == "Medium").sum()
-                low = (df["Fertility"] == "Low").sum()
+                # Summary
+                total = len(df_uploaded)
+                count_high = (df_uploaded["Fertility"] == "High").sum()
+                count_medium = (df_uploaded["Fertility"] == "Medium").sum()
+                count_low = (df_uploaded["Fertility"] == "Low").sum()
 
-                st.markdown(f"""
-                - 🟢 **{high} samples ({(high/total)*100:.1f}%)** have **High** fertility.
-                - 🟠 **{medium} samples ({(medium/total)*100:.1f}%)** have **Medium** fertility.
-                - 🔴 **{low} samples ({(low/total)*100:.1f}%)** have **Low** fertility.
-                """)
+                st.markdown(
+                    f"""
+                    - 🟢 **High Fertility:** {count_high} samples ({(count_high/total)*100:.1f}%)
+                    - 🟠 **Medium Fertility:** {count_medium} samples ({(count_medium/total)*100:.1f}%)
+                    - 🔴 **Low Fertility:** {count_low} samples ({(count_low/total)*100:.1f}%)
+                    """
+                )
 
-                st.subheader("🌱 Recommendations")
-                if low / total > 0.3:
-                    st.warning("🚨 High number of low fertility samples. Consider adding organic compost or nitrogen-rich fertilizers.")
-                elif medium / total > 0.5:
-                    st.info("⚠️ Majority samples are medium fertility. Moderate soil enrichment is recommended.")
+                # Recommendations based on fertility levels
+                st.subheader("Soil Health Recommendations")
+                if count_low / total > 0.3:
+                    st.warning("🚨 A large portion of samples have Low fertility. Consider adding organic compost or nitrogen-rich fertilizers.")
+                elif count_medium / total > 0.5:
+                    st.info("⚠️ Majority of samples have Medium fertility. Moderate soil enrichment recommended.")
                 else:
                     st.success("✅ Soil health looks good overall. Keep monitoring pH and moisture regularly.")
 
         except Exception as e:
             st.error(f"Error reading file: {e}")
-
     else:
         st.info("Please upload a CSV file to analyze soil health.")
 
-# --- Fertilizer Tips Tab ---
-elif st.session_state.selected_tab == "Fertilizer Tips":
-    st.header("🧪 Fertilizer Tips Based on Fertility Level")
+# --- Fertilizer Tips ---
+elif selected_tab == "Fertilizer Tips":
+    st.title("🧪 Fertilizer Tips Based on Fertility Level")
 
     for level, data in fertilizer_tips.items():
         st.markdown(
             f"""
             <div style='
-                background-color: {data['color']}; 
-                padding: 20px; 
-                margin-bottom: 20px; 
-                border-radius: 15px; 
+                background-color: {data['color']};
+                padding: 20px;
+                margin-bottom: 20px;
+                border-radius: 15px;
                 border: 2px solid #888;
             '>
                 <h2 style='color: #333; font-weight: 900;'>{level} Fertility</h2>
