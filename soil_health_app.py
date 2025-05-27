@@ -65,10 +65,17 @@ if st.button("Predict Crop Suggestion"):
         "High": ["Wheat", "Sugarcane"]
     }
 
+    fertilizer_tips = {
+        "Low": "Use organic compost, urea, and DAP to boost NPK levels.",
+        "Medium": "Apply balanced NPK fertilizers and practice crop rotation.",
+        "High": "Maintain current fertilization and monitor moisture & pH regularly."
+    }
+
     st.markdown(f"""
         <div style='font-size:26px; font-weight:bold;'>
             🧬 Predicted Fertility Level: <span style='color:blue'>{fertility}</span><br>
-            🌾 Recommended Crops: <span style='color:green'>{', '.join(crop_recommendation[fertility])}</span>
+            🌾 Recommended Crops: <span style='color:green'>{', '.join(crop_recommendation[fertility])}</span><br>
+            🧪 Fertilizer Tip: <span style='color:orange'>{fertilizer_tips[fertility]}</span>
         </div>
     """, unsafe_allow_html=True)
 
