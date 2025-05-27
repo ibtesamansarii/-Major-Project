@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import joblib
 from sklearn.ensemble import RandomForestClassifier
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # ---------------------------
 # Create dataset and model
@@ -74,3 +76,52 @@ if st.sidebar.button("Predict Fertility & Suggest Crops"):
     fertility_level, crops = suggest_crop(n, p, k, ph, moisture)
     st.success(f"🌱 Predicted Soil Fertility: **{fertility_level}**")
     st.info(f"🌾 Recommended Crops: {', '.join(crops)}")
+
+# ---------------------------
+# Batch Prediction via File Upload
+# ---------------------------
+st.markdown("---")
+st.subheader("📁 Batch Prediction with CSV Upload")
+
+uploaded_file = st.file_uploader("Upload CSV file with columns: N, P, K, pH, moisture", type=["csv"])
+
+if uploaded_file:
+    df_input = pd.read_csv(uploaded_file)
+    try:
+        preds = model.predict(df_input[["N", "P", "K", "pH", "moisture"]])
+        fertility_labels = {0: "Low", 1: "Medium", 2: "High"}
+        df_input["Fertility"] = [fertility_labels[p] for p in preds]
+
+        crop_map = {
+            "Low": ["Legumes", "Barley"],
+            "Medium": ["Maize", "Soybean"],
+            "High": ["Wheat", "Sugarcane"]
+        }
+        df_input["Recommended Crops"] = df_input["Fertility"].map(lambda x: ", ".join(crop_map[x]))
+
+        st.dataframe(df_input)
+        csv = df_input.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Results", csv, "fertility_predictions.csv", "text/csv")
+
+        # -------------------------
+        # Add Charts for Uploaded Data
+        # -------------------------
+        st.subheader("🔍 Data Visualization")
+
+        with st.expander("Show Nutrient Histograms"):
+            fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+            sns.histplot(df_input["N"], kde=True, ax=axs[0], color='green').set(title="Nitrogen (N)")
+            sns.histplot(df_input["P"], kde=True, ax=axs[1], color='orange').set(title="Phosphorus (P)")
+            sns.histplot(df_input["K"], kde=True, ax=axs[2], color='purple').set(title="Potassium (K)")
+            st.pyplot(fig)
+
+        with st.expander("Show Fertility Distribution"):
+            st.write("Soil Fertility Level Breakdown")
+            pie_data = df_input["Fertility"].value_counts()
+            fig2, ax2 = plt.subplots()
+            ax2.pie(pie_data, labels=pie_data.index, autopct='%1.1f%%', startangle=90, colors=['#7fc97f','#beaed4','#fdc086'])
+            ax2.axis('equal')
+            st.pyplot(fig2)
+
+    except Exception as e:
+        st.error("❌ Error in processing file: " + str(e))
