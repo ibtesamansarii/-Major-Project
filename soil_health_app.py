@@ -46,8 +46,8 @@ model = train_model()
 
 fertility_map = {0: "Low", 1: "Medium", 2: "High"}
 crop_recommendations = {
-    "Low": ["Legumes", "Barley"],
-    "Medium": ["Maize", "Soybean"],
+    "Low": ["Legumes", "Rice"],
+    "Medium": ["Maize", "wheat"],
     "High": ["Wheat", "Sugarcane"]
 }
 
