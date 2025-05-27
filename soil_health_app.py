@@ -4,11 +4,11 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
 
-# Must be first Streamlit command
+# Page config must be first
 st.set_page_config(page_title="Soil Health Analyzer", layout="wide")
 
 # ------------------------------
-# Train or load model
+# Model training (cached)
 # ------------------------------
 @st.cache_data
 def train_model():
@@ -45,14 +45,31 @@ model = train_model()
 fertility_map = {0: "Low", 1: "Medium", 2: "High"}
 crop_recommendations = {
     "Low": ["Legumes", "Barley"],
-    "Medium": ["Maize", "Rice"],       # Soybean replaced by Rice here
+    "Medium": ["Maize", "Rice"],  # Rice instead of Soybean
     "High": ["Wheat", "Sugarcane"]
 }
 
 # ------------------------------
-# UI
+# Functions
 # ------------------------------
+def predict_fertility_and_crops(n, p, k, ph, moisture):
+    input_df = pd.DataFrame([[n, p, k, ph, moisture]], columns=["N", "P", "K", "pH", "moisture"])
+    pred = model.predict(input_df)[0]
+    fertility = fertility_map[pred]
+    crops = crop_recommendations[fertility]
+    return fertility, crops
 
+def style_crop_tags(crops):
+    tags_html = ""
+    colors = {"Legumes": "#6ab04c", "Barley": "#f39c12", "Maize": "#2980b9", "Rice": "#27ae60", "Wheat": "#d35400", "Sugarcane": "#8e44ad"}
+    for crop in crops:
+        color = colors.get(crop, "#34495e")
+        tags_html += f"<span style='background-color:{color}; color:white; padding:6px 15px; margin:5px; font-weight:bold; border-radius:12px; font-size:20px; display:inline-block'>{crop}</span>"
+    return tags_html
+
+# ------------------------------
+# UI Layout
+# ------------------------------
 st.title("🌱 Soil Health & Crop Suggestion Analyzer")
 
 with st.sidebar:
@@ -63,22 +80,18 @@ with st.sidebar:
     ph = st.slider("pH", 4.5, 8.5, 6.5)
     moisture = st.slider("Moisture (%)", 10.0, 90.0, 50.0)
 
+st.markdown("---")
+
+# Prediction button & result
 if st.button("Predict Fertility and Suggest Crops"):
 
-    input_df = pd.DataFrame([[n, p, k, ph, moisture]], columns=["N", "P", "K", "pH", "moisture"])
-    pred = model.predict(input_df)[0]
-    fertility = fertility_map[pred]
-    crops = crop_recommendations[fertility]
+    fertility, crops = predict_fertility_and_crops(n, p, k, ph, moisture)
 
-    # Colored badge for fertility level
-    color_map = {"Low": "#FF6347", "Medium": "#FFA500", "High": "#32CD32"}  # tomato, orange, limegreen
-    st.markdown(f"### Fertility Level: <span style='color:{color_map[fertility]}; font-weight:bold'>{fertility}</span>", unsafe_allow_html=True)
+    color_map = {"Low": "#FF6347", "Medium": "#FFA500", "High": "#32CD32"}
+    st.markdown(f"### Fertility Level: <span style='color:{color_map[fertility]}; font-weight:bold; font-size:28px'>{fertility}</span>", unsafe_allow_html=True)
 
-    # Show crop suggestions as tags/buttons
     st.markdown("**Recommended Crops:**")
-    cols = st.columns(len(crops))
-    for i, crop in enumerate(crops):
-        cols[i].button(crop)
+    st.markdown(style_crop_tags(crops), unsafe_allow_html=True)
 
     # Nutrient bar chart for input values
     st.markdown("---")
@@ -97,18 +110,47 @@ if st.button("Predict Fertility and Suggest Crops"):
     ax.set_title("Nutrient Levels vs. Fertility Thresholds")
     ax.legend()
 
-    # Label bars with values
     for bar in bars:
         height = bar.get_height()
         ax.annotate(f'{height}',
                     xy=(bar.get_x() + bar.get_width() / 2, height),
-                    xytext=(0, 3),  # 3 points vertical offset
+                    xytext=(0, 3),
                     textcoords="offset points",
                     ha='center', va='bottom')
 
     st.pyplot(fig)
 
-    # Show input pH and moisture info
     st.markdown("---")
     st.markdown(f"**Soil pH:** {ph} (ideal range: 6.0 - 7.5)")
     st.markdown(f"**Soil Moisture:** {moisture}% (optimal varies by crop)")
+
+# ------------------------------
+# Upload CSV for batch prediction
+# ------------------------------
+st.markdown("---")
+st.header("📂 Upload CSV file for batch soil fertility prediction")
+
+uploaded_file = st.file_uploader("Upload a CSV file with columns: N, P, K, pH, moisture", type=["csv"])
+
+if uploaded_file is not None:
+    try:
+        df = pd.read_csv(uploaded_file)
+        required_cols = {"N", "P", "K", "pH", "moisture"}
+        if not required_cols.issubset(set(df.columns)):
+            st.error(f"CSV must contain columns: {required_cols}")
+        else:
+            X = df[["N", "P", "K", "pH", "moisture"]]
+            preds = model.predict(X)
+            df["Fertility Level"] = [fertility_map[p] for p in preds]
+            df["Recommended Crops"] = df["Fertility Level"].map(crop_recommendations)
+
+            # Show dataframe with crop tags styled
+            def format_crops(crops):
+                return ", ".join(crops)
+
+            df["Recommended Crops"] = df["Recommended Crops"].apply(format_crops)
+
+            st.dataframe(df)
+
+    except Exception as e:
+        st.error(f"Error processing file: {e}")
